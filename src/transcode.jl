@@ -27,7 +27,7 @@ julia> String(decompressed)
 
 ```
 """
-function Base.transcode(::Type{C}, data::ByteData) where C<:Codec
+function Base.transcode(::Type{C}, data::ByteData) where {C<:Codec}
     codec = C()
     initialize(codec)
     try
@@ -82,39 +82,41 @@ function Base.transcode(codec::Codec, data::ByteData)
     error = Error()
     code = startproc(codec, :write, error)
     if code === :error
-        @goto error
+        throw(error[])
     end
     n = minoutsize(codec, buffermem(input))
-    @label process
-    makemargin!(output, n)
-    Δin, Δout, code = process(codec, buffermem(input), marginmem(output), error)
-    @debug(
-        "called process()",
-        code = code,
-        input_size = buffersize(input),
-        output_size = marginsize(output),
-        input_delta = Δin,
-        output_delta = Δout,
-    )
-    consumed!(input, Δin)
-    supplied!(output, Δout)
-    if code === :error
-        @goto error
-    elseif code === :end
-        if buffersize(input) > 0
-            if startproc(codec, :write, error) === :error
-                @goto error
+
+    while true
+        makemargin!(output, n)
+        Δin, Δout, code = process(codec, buffermem(input), marginmem(output), error)
+        @debug(
+            "called process()",
+            code = code,
+            input_size = buffersize(input),
+            output_size = marginsize(output),
+            input_delta = Δin,
+            output_delta = Δout,
+        )
+        consumed!(input, Δin)
+        supplied!(output, Δout)
+        if code === :error
+            break
+        elseif code === :end
+            if buffersize(input) > 0
+                if startproc(codec, :write, error) === :error
+                    break
+                end
+                n = minoutsize(codec, buffermem(input))
+                continue
             end
-            n = minoutsize(codec, buffermem(input))
-            @goto process
+            resize!(output.data, output.marginpos - 1)
+            return output.data
+        else
+            n = max(Δout, minoutsize(codec, buffermem(input)))
+            continue
         end
-        resize!(output.data, output.marginpos - 1)
-        return output.data
-    else
-        n = max(Δout, minoutsize(codec, buffermem(input)))
-        @goto process
     end
-    @label error
+
     if !haserror(error)
         set_default_error!(error)
     end
