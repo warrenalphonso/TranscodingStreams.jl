@@ -21,7 +21,7 @@ struct TranscodingStream{C<:Codec,S<:IO} <: IO
     state::State
 
     function TranscodingStream{C,S}(
-            codec::C, stream::S, state::State, initialized::Bool) where {C<:Codec,S<:IO}
+        codec::C, stream::S, state::State, initialized::Bool) where {C<:Codec,S<:IO}
         if !isopen(stream)
             throw(ArgumentError("closed stream"))
         elseif state.mode != :idle
@@ -35,7 +35,7 @@ struct TranscodingStream{C<:Codec,S<:IO} <: IO
 end
 
 function TranscodingStream(codec::C, stream::S, state::State;
-                           initialized::Bool=false) where {C<:Codec,S<:IO}
+    initialized::Bool=false) where {C<:Codec,S<:IO}
     return TranscodingStream{C,S}(codec, stream, state, initialized)
 end
 
@@ -111,15 +111,15 @@ julia> close(stream)
 ```
 """
 function TranscodingStream(codec::Codec, stream::IO;
-                           bufsize::Integer=DEFAULT_BUFFER_SIZE,
-                           stop_on_end::Bool=false,
-                           sharedbuf::Bool=(stream isa TranscodingStream))
+    bufsize::Integer=DEFAULT_BUFFER_SIZE,
+    stop_on_end::Bool=false,
+    sharedbuf::Bool=(stream isa TranscodingStream))
     checkbufsize(bufsize)
     checksharedbuf(sharedbuf, stream)
     if sharedbuf
-    	# Here, the compiler cannot infer at compile time that the
-    	# stream must be a TranscodingStream, so we need to help the
-    	# compiler along. See https://github.com/JuliaIO/TranscodingStreams.jl/pull/111
+        # Here, the compiler cannot infer at compile time that the
+        # stream must be a TranscodingStream, so we need to help the
+        # compiler along. See https://github.com/JuliaIO/TranscodingStreams.jl/pull/111
         stream::TranscodingStream
         state = State(Buffer(bufsize), stream.state.buffer1)
     else
@@ -158,7 +158,7 @@ end
 # Base IO Functions
 # -----------------
 
-function Base.open(f::Function, ::Type{T}, args...) where T<:TranscodingStream
+function Base.open(f::Function, ::Type{T}, args...) where {T<:TranscodingStream}
     stream = T(open(args...))
     try
         f(stream)
@@ -334,7 +334,7 @@ function Base.readuntil(stream::TranscodingStream, delim::UInt8; keep::Bool=fals
             @assert filled == 0
             ret = Vector{UInt8}(undef, sz)
         end
-        GC.@preserve ret copydata!(pointer(ret, filled+1), buffer1, sz)
+        GC.@preserve ret copydata!(pointer(ret, filled + 1), buffer1, sz)
         filled += sz
         if found
             if !keep
@@ -379,7 +379,7 @@ function Base.readbytes!(stream::TranscodingStream, b::AbstractArray{UInt8}, nb=
             resize!(b, min(length(b) * 2, nb))
             resized = true
         end
-        filled += GC.@preserve b unsafe_read(stream, pointer(b, filled+1), min(length(b), nb)-filled)
+        filled += GC.@preserve b unsafe_read(stream, pointer(b, filled + 1), min(length(b), nb) - filled)
     end
     if resized
         resize!(b, filled)
@@ -533,7 +533,7 @@ function Base.show(io::IO, stats::Stats)
     println(io, "  in: ", stats.in)
     println(io, "  out: ", stats.out)
     println(io, "  transcoded_in: ", stats.transcoded_in)
-      print(io, "  transcoded_out: ", stats.transcoded_out)
+    print(io, "  transcoded_out: ", stats.transcoded_out)
 end
 
 """
@@ -569,12 +569,12 @@ end
 # Buffering
 # ---------
 
-function fillbuffer(stream::TranscodingStream; eager::Bool = false)
+function fillbuffer(stream::TranscodingStream; eager::Bool=false)
     changemode!(stream, :read)
     buffer1 = stream.state.buffer1
     buffer2 = stream.state.buffer2
     nfilled::Int = 0
-    while ((!eager && buffersize(buffer1) == 0) || (eager && makemargin!(buffer1, 0, eager = true) > 0)) && stream.state.mode != :stop
+    while ((!eager && buffersize(buffer1) == 0) || (eager && makemargin!(buffer1, 0, eager=true) > 0)) && stream.state.mode != :stop
         if stream.state.code == :end
             if buffersize(buffer2) == 0 && eof(stream.stream)
                 break
@@ -630,10 +630,11 @@ end
 
 # Call `startproc` with epilogne.
 function callstartproc(stream::TranscodingStream, mode::Symbol)
-    state = stream.state
-    state.code = startproc(stream.codec, mode, state.error)
-    if state.code == :error
+    try
+        startproc(stream.codec, mode)
+    catch
         changemode!(stream, :panic)
+        rethrow()
     end
     return
 end
@@ -643,7 +644,15 @@ function callprocess(stream::TranscodingStream, inbuf::Buffer, outbuf::Buffer)
     state = stream.state
     input = buffermem(inbuf)
     GC.@preserve inbuf makemargin!(outbuf, minoutsize(stream.codec, input))
-    Δin, Δout, state.code = GC.@preserve inbuf outbuf process(stream.codec, input, marginmem(outbuf), state.error)
+
+    local Δin, Δout
+
+    try
+        Δin, Δout, state.code = GC.@preserve inbuf outbuf process(stream.codec, input, marginmem(outbuf))
+    catch
+        changemode!(stream, :panic)
+        rethrow()
+    end
     @debug(
         "called process()",
         code = state.code,
@@ -652,11 +661,9 @@ function callprocess(stream::TranscodingStream, inbuf::Buffer, outbuf::Buffer)
         input_delta = Δin,
         output_delta = Δout,
     )
-    consumed!(inbuf, Δin, transcode = true)
-    supplied!(outbuf, Δout, transcode = true)
-    if state.code == :error
-        changemode!(stream, :panic)
-    elseif state.code == :ok && Δin == Δout == 0
+    consumed!(inbuf, Δin, transcode=true)
+    supplied!(outbuf, Δout, transcode=true)
+    if state.code == :ok && Δin == Δout == 0
         # When no progress, expand the output buffer.
         makemargin!(outbuf, max(16, marginsize(outbuf) * 2))
     elseif state.code == :end && state.stop_on_end
@@ -714,6 +721,8 @@ end
 # Mode Transition
 # ---------------
 
+# TODO: Simplify a lot! Can I get rid of this or split it up? 
+
 # Change the current mode.
 function changemode!(stream::TranscodingStream, newmode::Symbol)
     state = stream.state
@@ -724,29 +733,28 @@ function changemode!(stream::TranscodingStream, newmode::Symbol)
         # mode does not change
         return
     elseif newmode == :panic
-        if !haserror(state.error)
-            set_default_error!(state.error)
-        end
         state.mode = newmode
-        finalize_codec(stream.codec, state.error)
-        throw(state.error[])
+        finalize(stream.codec)
+        return
     elseif mode == :idle
         if newmode == :read || newmode == :write
-            state.code = startproc(stream.codec, newmode, state.error)
-            if state.code == :error
+            try
+                state.code = startproc(stream.codec, newmode)
+            catch
                 changemode!(stream, :panic)
+                rethrow()
             end
             state.mode = newmode
             return
         elseif newmode == :close
             state.mode = newmode
-            finalize_codec(stream.codec, state.error)
+            finalize(stream.codec)
             return
         end
     elseif mode == :read
         if newmode == :close || newmode == :stop
             state.mode = newmode
-            finalize_codec(stream.codec, state.error)
+            finalize(stream.codec)
             return
         end
     elseif mode == :write
@@ -756,7 +764,7 @@ function changemode!(stream::TranscodingStream, newmode::Symbol)
                 flushuntilend(stream)
             end
             state.mode = newmode
-            finalize_codec(stream.codec, state.error)
+            finalize(stream.codec)
             return
         end
     elseif mode == :stop
@@ -765,6 +773,8 @@ function changemode!(stream::TranscodingStream, newmode::Symbol)
             return
         end
     elseif mode == :panic
+        # ???
+        # Is it possible to get here?
         throw_panic_error()
     end
     throw(ArgumentError("cannot change the mode from $(mode) to $(newmode)"))
@@ -780,22 +790,4 @@ end
 # Throw an argument error (must be called only when the mode is panic).
 function throw_panic_error()
     throw(ArgumentError("stream is in unrecoverable error; only isopen and close are callable"))
-end
-
-# Set a defualt error.
-function set_default_error!(error::Error)
-    error[] = ErrorException("unknown error happened while processing data")
-end
-
-# Call the finalize method of the codec.
-function finalize_codec(codec::Codec, error::Error)
-    try
-        finalize(codec)
-    catch
-        if haserror(error)
-            throw(error[])
-        else
-            rethrow()
-        end
-    end
 end

@@ -70,18 +70,18 @@ the stream will become the close mode for safety.
 
 ### `startproc`
 
-The `startproc(codec::C, mode::Symbol, error::Error)::Symbol` method takes
-`codec`, `mode` and `error`, and returns a status code. This is called just
+The `startproc(codec::C, mode::Symbol)::Symbol` method takes
+`codec` and `mode`, and returns a status code. This is called just
 before the stream starts reading or writing data. `mode` is either `:read` or
 `:write` and then the stream starts reading or writing, respectively.  The
 return code must be `:ok` if `codec` is ready to read or write data.  Otherwise,
-it must be `:error` and the `error` argument must be set to an exception object.
+it must be `:error`.
 
 ### `process`
 
-The `process(codec::C, input::Memory, output::Memory,
-error::Error)::Tuple{Int,Int,Symbol}` method takes `codec`, `input`, `output`
-and `error`, and returns a consumed data size, a produced data size and a status
+The `process(codec::C, input::Memory, output::Memory)::Tuple{Int,Int,Symbol}` 
+method takes `codec`, `input`, and `output`, and returns a consumed data size, a 
+produced data size and a status
 code. This is called repeatedly while processing data. The input (`input`) and
 output (`output`) data are a `Memory` object, which is a pointer to a contiguous
 memory region with size. You must read input data from `input`, transcode the
@@ -92,8 +92,7 @@ When transcoding reaches the end of a data stream, it is notified to this method
 by empty input. In that case, the method need to write the buffered data (if
 any) to `output`. If there is no data to write, the status code must be set to
 `:end`. The `process` method will be called repeatedly until it returns `:end`
-status code. If an error happens while processing data, the `error` argument
-must be set to an exception object and the return code must be `:error`.
+status code. 
 """
 abstract type Codec end
 
@@ -146,24 +145,24 @@ function finalize(codec::Codec)::Nothing
 end
 
 """
-    startproc(codec::Codec, mode::Symbol, error::Error)::Symbol
+    startproc(codec::Codec, mode::Symbol)::Symbol
 
 Start data processing with `codec` of `mode`.
 
 The default method does nothing and returns `:ok`.
 """
-function startproc(codec::Codec, mode::Symbol, error::Error)::Symbol
+function startproc(codec::Codec, mode::Symbol)::Symbol
     return :ok
 end
 
 """
-    process(codec::Codec, input::Memory, output::Memory, error::Error)::Tuple{Int,Int,Symbol}
+    process(codec::Codec, input::Memory, output::Memory)::Tuple{Int,Int,Symbol}
 
 Do data processing with `codec`.
 
 There is no default method.
 """
-function process(codec::Codec, input::Memory, output::Memory, error::Error)::Tuple{Int,Int,Symbol}
+function process(codec::Codec, input::Memory, output::Memory)::Tuple{Int,Int,Symbol}
     # no default method
-    throw(MethodError(process, (codec, input, output, error)))
+    throw(MethodError(process, (codec, input, output)))
 end

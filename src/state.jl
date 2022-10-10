@@ -12,20 +12,17 @@ mutable struct State
     mode::Symbol  # {:idle, :read, :write, :stop, :close, :panic}
 
     # return code of the last method call
-    code::Symbol  # {:ok, :end, :error}
+    code::Symbol  # {:ok, :end}
 
     # flag to go :stop on :end
     stop_on_end::Bool
-
-    # exception thrown while data processing
-    error::Error
 
     # data buffers
     buffer1::Buffer
     buffer2::Buffer
 
     function State(buffer1::Buffer, buffer2::Buffer)
-        return new(:idle, :ok, false, Error(), buffer1, buffer2)
+        return new(:idle, :ok, false, buffer1, buffer2)
     end
 end
 
