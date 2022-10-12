@@ -10,8 +10,10 @@ using TranscodingStreams:
     bufferptr, buffersize, buffermem,
     marginptr, marginsize, marginmem,
     readbyte!, writebyte!,
-    #=ismarked,=# mark!, unmark!, reset!,
-    makemargin!, emptybuffer!
+    mark!, unmark!, reset!,
+    makemargin!, emptybuffer!, initialize, TOKEN_END
+
+include("testtools.jl")
 
 @testset "Buffer" begin
     buf = Buffer(1024)
@@ -26,7 +28,7 @@ using TranscodingStreams:
     @test buffermem(buf) === Memory(pointer(data), 6)
     @test marginptr(buf) === pointer(data) + 6
     @test marginsize(buf) === 0
-    @test marginmem(buf) === Memory(pointer(data)+6, 0)
+    @test marginmem(buf) === Memory(pointer(data) + 6, 0)
 
     buf = Buffer(2)
     writebyte!(buf, 0x34)
@@ -93,14 +95,14 @@ end
 end
 
 @testset "Stats" begin
-    stats = TranscodingStreams.Stats(1,2,3,4)
+    stats = TranscodingStreams.Stats(1, 2, 3, 4)
     @test repr(stats) ==
-    """
-    TranscodingStreams.Stats:
-      in: 1
-      out: 2
-      transcoded_in: 3
-      transcoded_out: 4"""
+          """
+          TranscodingStreams.Stats:
+            in: 1
+            out: 2
+            transcoded_in: 3
+            transcoded_out: 4"""
     @test stats.in == 1
     @test stats.out == 2
     @test stats.transcoded_in == 3
@@ -110,7 +112,7 @@ end
 @testset "Utils" begin
     @test TranscodingStreams.splitkwargs(
         [(:foo, 1), (:bar, true), (:baz, :ok)], (:foo,)) ==
-        ([(:foo, 1)], [(:bar, true), (:baz, :ok)])
+          ([(:foo, 1)], [(:bar, true), (:baz, :ok)])
 end
 
 
@@ -122,6 +124,7 @@ include("codecinvalid.jl")
 include("codecquadruple.jl")
 
 # Test third-party codec packages.
-for pkg in ["CodecZlib", "CodecXz", "CodecZstd", "CodecBase"]
-    Pkg.test(pkg)
-end
+# TODO: These break since we removed testtools.jl
+# for pkg in ["CodecZlib", "CodecXz", "CodecZstd", "CodecBase"]
+#     Pkg.test(pkg)
+# end

@@ -2,10 +2,9 @@
 struct QuadrupleCodec <: TranscodingStreams.Codec end
 
 function TranscodingStreams.process(
-        codec  :: QuadrupleCodec,
-        input  :: TranscodingStreams.Memory,
-        output :: TranscodingStreams.Memory,
-        error  :: TranscodingStreams.Error)
+    codec::QuadrupleCodec,
+    input::TranscodingStreams.Memory,
+    output::TranscodingStreams.Memory)
     i = j = 0
     while i + 1 ≤ lastindex(input) && j + 4 ≤ lastindex(output)
         b = input[i+1]
@@ -17,14 +16,14 @@ function TranscodingStreams.process(
 end
 
 function TranscodingStreams.expectedsize(
-              :: QuadrupleCodec,
-        input :: TranscodingStreams.Memory)
+    ::QuadrupleCodec,
+    input::TranscodingStreams.Memory)
     return input.size * 4
 end
 
 function TranscodingStreams.minoutsize(
-        :: QuadrupleCodec,
-        :: TranscodingStreams.Memory)
+    ::QuadrupleCodec,
+    ::TranscodingStreams.Memory)
     return 4
 end
 

@@ -183,23 +183,23 @@
     close(stream)
 
     data = b""
-    @test transcode(Noop, data)  == data
+    @test transcode(Noop, data) == data
     @test transcode(Noop, data) !== data
     data = b"foo"
-    @test transcode(Noop, data)  == data
+    @test transcode(Noop, data) == data
     @test transcode(Noop, data) !== data
 
     data = b""
-    @test transcode(Noop(), data)  == data
+    @test transcode(Noop(), data) == data
     @test transcode(Noop(), data) !== data
     data = b"foo"
-    @test transcode(Noop(), data)  == data
+    @test transcode(Noop(), data) == data
     @test transcode(Noop(), data) !== data
 
-    TranscodingStreams.test_roundtrip_transcode(Noop, Noop)
-    TranscodingStreams.test_roundtrip_read(NoopStream, NoopStream)
-    TranscodingStreams.test_roundtrip_write(NoopStream, NoopStream)
-    TranscodingStreams.test_roundtrip_lines(NoopStream, NoopStream)
+    test_roundtrip_transcode(Noop, Noop)
+    test_roundtrip_read(NoopStream, NoopStream)
+    test_roundtrip_write(NoopStream, NoopStream)
+    test_roundtrip_lines(NoopStream, NoopStream)
 
     # switch write => read
     stream = NoopStream(IOBuffer(b"foobar", read=true, write=true))
@@ -271,16 +271,19 @@
         @test read(stream) == b"bar"
 
         stream = NoopStream(IOBuffer("foo,bar"))
-        @test readuntil(stream, UInt8(','), keep = false) == b"foo"
+        @test readuntil(stream, UInt8(','), keep=false) == b"foo"
         @test read(stream) == b"bar"
 
         stream = NoopStream(IOBuffer("foo,bar"))
-        @test readuntil(stream, UInt8(','), keep = true) == b"foo,"
+        @test readuntil(stream, UInt8(','), keep=true) == b"foo,"
         @test read(stream) == b"bar"
     end
 
     @test_throws ArgumentError NoopStream(IOBuffer(), bufsize=0)
-    @test_throws ArgumentError NoopStream(let s = IOBuffer(); close(s); s; end)
+    @test_throws ArgumentError NoopStream(let s = IOBuffer()
+        close(s)
+        s
+    end)
     @test_throws ArgumentError TranscodingStream(Noop(), IOBuffer(), bufsize=0)
     @test_throws ArgumentError TranscodingStream(Noop(), IOBuffer(), sharedbuf=true)
 
